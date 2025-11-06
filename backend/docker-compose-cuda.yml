@@ -1,0 +1,54 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    environment:
+      - POSTGRES_DB=postgres
+      - POSTGRES_USER=root
+      - POSTGRES_PASSWORD=rootpwd
+    ports:
+      - "54320:5432"
+    volumes:
+      - ./postgres-data:/var/lib/postgresql/data
+
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - 11434:11434
+    environment:
+      - OLLAMA_MODELS="/ollama/models"
+    volumes:
+      - ./models:/ollama/models
+      - ./ollama_entrypoint.sh:/ollama_entrypoint.sh
+    container_name: ollama
+    pull_policy: always
+    tty: true
+    entrypoint: ["/usr/bin/bash", "/ollama_entrypoint.sh"]
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+  app:
+    build: .
+    depends_on:
+      - postgres
+      - ollama
+    volumes:
+      - ./documents:/app/documents
+      - ./models:/app/models
+    ports:
+      - "7860:7860"
+    environment:
+      - DATABASE_DSN=postgresql://root:rootpwd@postgres:5432/postgres
+      - OLLAMA_URL=http://ollama:11434/v1
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
